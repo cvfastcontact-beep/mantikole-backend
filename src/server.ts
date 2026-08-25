@@ -8,6 +8,9 @@ import highlightsRoutes from './routes/highlights.routes';
 import lettersRoutes from './routes/letters.routes';
 import aiRoutes from './routes/ai.routes';
 import adminRoutes from './routes/admin.routes';
+import settingsRoutes from './routes/settings.routes';
+import staffRoutes from './routes/staff.routes';
+import faqRoutes from './routes/faq.routes';
 
 dotenv.config();
 
@@ -31,7 +34,7 @@ app.get('/', (req: Request, res: Response) => {
   res.json({
     name: 'Website Desa Mantikole API',
     status: 'Operational',
-    version: '1.0.0',
+    version: '1.1.0',
     timestamp: new Date().toISOString(),
   });
 });
@@ -43,6 +46,9 @@ app.use('/api/v1/highlights', highlightsRoutes);
 app.use('/api/v1/letters', lettersRoutes);
 app.use('/api/v1/ai', aiRoutes);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/settings', settingsRoutes);
+app.use('/api/v1/staff', staffRoutes);
+app.use('/api/v1/faqs', faqRoutes);
 
 // 404 Route Handler
 app.use((req: Request, res: Response) => {

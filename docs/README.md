@@ -10,6 +10,8 @@ Seluruh dokumentasi disusun berdasarkan tanggal dan judul fitur sesuai perkemban
 |---|---|---|
 | **2026-08-06** | [`2026-08-06-setup-arsitektur-dan-rest-api.md`](./2026-08-06-setup-arsitektur-dan-rest-api.md) | Inisialisasi arsitektur Express.js, TypeScript, PostgreSQL Schema, Seed Data, Auth Middleware, dan REST API routes awal. |
 | **2026-08-07** | [`2026-08-07-optimasi-rute-metadata-artikel.md`](./2026-08-07-optimasi-rute-metadata-artikel.md) | Optimasi pencarian artikel warta melalui endpoint `GET /articles/:idOrSlug` berbasis ID maupun Slug. |
+| **2026-08-09** | [`2026-08-09-modularisasi-dan-arsitektur-layered-backend.md`](./2026-08-09-modularisasi-dan-arsitektur-layered-backend.md) | Refactoring arsitektur ke dalam Layered Architecture (Services → Controllers → Routes) berprinsip SOLID-SRP. |
+| **2026-08-25** | [`2026-08-25-fitur-cms-dinamis-dan-otomasi-rag-ai.md`](./2026-08-25-fitur-cms-dinamis-dan-otomasi-rag-ai.md) | Endpoint settings, staff, dan faqs untuk CMS 100% dinamis serta otomasi penuh context RAG AI langsung dari live database. |
 
 ---
 
