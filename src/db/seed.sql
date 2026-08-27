@@ -11,7 +11,47 @@ VALUES (
     'admin'
 ) ON CONFLICT (username) DO NOTHING;
 
--- 2. SEED VILLAGE HIGHLIGHTS (WISATA & KOMODITAS)
+-- 2. SEED SITE SETTINGS & DEMOGRAPHICS
+INSERT INTO site_settings (key, value)
+VALUES 
+('hero_title', '"Selamat Datang di Portal Resmi Desa Mantikole"'),
+('hero_subtitle', '"Kecamatan Dolo Barat, Kabupaten Sigi, Sulawesi Tengah. Pusat informasi wisata pemandian air panas alami, perkebunan kakao, dan pelayanan surat digital mandiri."'),
+('hero_slogan', '"Maju Bersama Menuju Kemandirian Desa Digital"'),
+('village_location_text', '"Kecamatan Dolo Barat, Kabupaten Sigi, Sulawesi Tengah. Akses rute menuju pusat pemerintahan desa, destinasi wisata pemandian air panas alami, dan kawasan perkebunan."'),
+('maps_embed_url', '"https://maps.google.com/maps?q=-1.0745,119.8322&z=13&output=embed"'),
+('maps_direct_url', '"https://www.google.com/maps/search/?api=1&query=-1.0745,119.8322"'),
+('contact_phone', '"0812-3456-7890"'),
+('contact_email', '"kantor@desamantikole.id"'),
+('office_hours', '"Senin - Jumat, 08:00 - 15:00 WITA"'),
+('total_population', '2145'),
+('total_families', '582'),
+('total_area_km2', '"18.45"'),
+('total_hamlets', '3'),
+('cacao_production_tons', '120'),
+('hotsprings_visitors_monthly', '1850')
+ON CONFLICT (key) DO NOTHING;
+
+-- 3. SEED VILLAGE STAFF (PERANGKAT DESA)
+INSERT INTO village_staff (id, name, role, description, image_url, order_index)
+VALUES
+('staff-1', 'Drs. H. Moh. Rizal', 'Kepala Desa', 'Pemimpin Pemerintah Desa Mantikole', '/images/perangkat/kepala_desa.png', 1),
+('staff-2', 'Ahmad Subagyo, S.Sos', 'Sekretaris Desa', 'Koordinator Administrasi & Keuangan', '/images/perangkat/sekretaris_desa.png', 2),
+('staff-3', 'Ir. Hendra Prasetyo', 'Ketua BPD', 'Badan Permusyawaratan Desa', '/images/perangkat/ketua_bpd.png', 3),
+('staff-4', 'Siti Rahmawati, S.E', 'Kaur Keuangan', 'Pengelola Anggaran & Keuangan Desa', '/images/perangkat/kaur_keuangan.png', 4),
+('staff-5', 'Rahmat Hidayat, S.IP', 'Kasi Pemerintahan', 'Pelayanan Publik & Tataprama Desa', '/images/perangkat/kasi_pemerintahan.png', 5)
+ON CONFLICT (id) DO NOTHING;
+
+-- 4. SEED FAQS
+INSERT INTO faqs (id, question, answer, category, order_index)
+VALUES
+('faq-1', 'Berapa tiket masuk Pemandian Air Panas Alami Mantikole?', 'Tiket masuk Pemandian Air Panas Mantikole sebesar Rp 5.000 per orang. Buka setiap hari pukul 07:00 - 18:00 WITA. Air panas alami pegunungan kaya kandungan belerang untuk kesehatan kulit dan terapi kebugaran.', 'Wisata', 1),
+('faq-2', 'Bagaimana cara mengajukan surat keterangan mandiri tanpa antre?', 'Warga cukup membuka menu "Layanan Surat" di website ini, memilih jenis surat (SKU/SKD/SKTM), mengisikan NIK 16 digit dan data diri, lalu klik Kirim. Anda akan langsung menerima Nomor Tiket Resi (misal: MNT-2026-08001) untuk melacak verifikasi status oleh perangkat desa.', 'Layanan', 2),
+('faq-3', 'Berapa lama proses verifikasi surat oleh perangkat desa?', 'Verifikasi dokumen oleh staf desa membutuhkan waktu 1-2 hari kerja. Setelah status permohonan menjadi "COMPLETED", surat resmi dapat dicetak atau diambil langsung di Kantor Desa Mantikole.', 'Layanan', 3),
+('faq-4', 'Apa saja potensi komoditas perkebunan unggulan di Desa Mantikole?', 'Komoditas perkebunan utama warga adalah Kakao (Cokelat) dengan teknik fermentasi modern berkualitas tinggi, Cengkeh aromatik, Kelapa murni, Jagung, dan Padi persawahan.', 'Komoditas', 4),
+('faq-5', 'Kapan jam operasional pelayanan Kantor Desa Mantikole?', 'Pelayanan fisik Kantor Desa beroperasi pada hari Senin hingga Jumat, pukul 08:00 - 15:00 WITA. Sedangkan permohonan surat digital dan informasi AI Chatbot aktif 24 jam.', 'Umum', 5)
+ON CONFLICT (id) DO NOTHING;
+
+-- 5. SEED VILLAGE HIGHLIGHTS (WISATA & KOMODITAS)
 INSERT INTO village_highlights (id, title, slug, type, short_description, full_description, location_details, latitude, longitude, price_info, gallery_urls)
 VALUES 
 (
@@ -77,7 +117,7 @@ VALUES
     ]
 ) ON CONFLICT (slug) DO NOTHING;
 
--- 3. SEED ARTICLES
+-- 6. SEED ARTICLES
 INSERT INTO articles (id, title, slug, content, summary, category, featured_image_url, author_id, is_published, views_count)
 VALUES
 (
@@ -117,7 +157,7 @@ VALUES
     76
 ) ON CONFLICT (slug) DO NOTHING;
 
--- 4. SEED LETTER TEMPLATES
+-- 7. SEED LETTER TEMPLATES
 INSERT INTO letter_templates (id, title, code, description, file_url, requirements)
 VALUES
 (
@@ -144,13 +184,3 @@ VALUES
     '/templates/template-sktm-mantikole.docx',
     ARRAY['Kartu Tanda Penduduk (KTP) Pemohon', 'Kartu Keluarga (KK) Pemohon', 'Surat Pengantar RT/RW', 'Foto Kondisi Rumah']
 ) ON CONFLICT (code) DO NOTHING;
-
--- 5. SEED AI KNOWLEDGE BASE
-INSERT INTO ai_knowledge_base (category, title, content)
-VALUES
-('Wisata', 'Pemandian Air Panas Alami Mantikole', 'Pemandian Air Panas Mantikole berlokasi di Kecamatan Dolo Barat, Kabupaten Sigi, Sulawesi Tengah. Tiket masuk senilai Rp 5.000 per orang. Mengandung belerang alami yang sangat bermanfaat bagi relaksasi dan kesehatan kulit.'),
-('Wisata', 'Wisata Air Terjun Mantikole', 'Wisata Air Terjun Mantikole menawarkan kesejukan pegunungan Sigi dengan akses trekking alami. Buka setiap hari, bebas biaya masuk (donasi kebersihan seikhlasnya).'),
-('Layanan', 'Jam Pelayanan Kantor Desa', 'Kantor Desa Mantikole melayani masyarakat pada hari Senin hingga Jumat, pukul 08:00 - 15:00 WITA. Pengajuan surat mandiri juga dapat diakses 24 jam melalui website resmi.'),
-('Layanan', 'Persyaratan Surat Keterangan Usaha (SKU)', 'Untuk mengajukan SKU warga wajib menyiapkan foto KTP, KK, dan foto tempat usaha. Proses verifikasi admin memerlukan 1-2 hari kerja dan dapat dilacak via nomor resi MNT-2026-XXXXX.'),
-('Komoditas', 'Kakao & Rempah Desa Mantikole', 'Desa Mantikole menghasilkan komoditas utama berupa Kakao (biji cokelat kering), Cengkeh, Kelapa, Padi, dan Jagung.')
-;

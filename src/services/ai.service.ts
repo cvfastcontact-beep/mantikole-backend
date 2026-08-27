@@ -34,14 +34,47 @@ async function buildDynamicRagContext(): Promise<{
   articles: typeof memoryStore.articles;
   templates: typeof memoryStore.letter_templates;
 }> {
-  return {
-    settings: memoryStore.site_settings,
-    staff: memoryStore.village_staff,
-    faqs: memoryStore.faqs,
-    highlights: memoryStore.village_highlights,
-    articles: memoryStore.articles.filter((a) => a.is_published),
-    templates: memoryStore.letter_templates,
-  };
+  let settings = memoryStore.site_settings;
+  let staff = memoryStore.village_staff;
+  let faqs = memoryStore.faqs;
+  let highlights = memoryStore.village_highlights;
+  let articles = memoryStore.articles.filter((a) => a.is_published);
+  let templates = memoryStore.letter_templates;
+
+  if (pool) {
+    try {
+      const [settingsRes, staffRes, faqsRes, highlightsRes, articlesRes, templatesRes] = await Promise.all([
+        pool.query('SELECT key, value FROM site_settings').catch(() => ({ rows: [] })),
+        pool.query('SELECT * FROM village_staff ORDER BY order_index ASC').catch(() => ({ rows: [] })),
+        pool.query('SELECT * FROM faqs ORDER BY order_index ASC').catch(() => ({ rows: [] })),
+        pool.query('SELECT * FROM village_highlights').catch(() => ({ rows: [] })),
+        pool.query('SELECT * FROM articles WHERE is_published = true').catch(() => ({ rows: [] })),
+        pool.query('SELECT * FROM letter_templates').catch(() => ({ rows: [] })),
+      ]);
+
+      if (settingsRes.rows.length > 0) {
+        const obj: Record<string, any> = {};
+        settingsRes.rows.forEach((r) => {
+          try {
+            obj[r.key] = JSON.parse(r.value);
+          } catch {
+            obj[r.key] = r.value;
+          }
+        });
+        settings = { ...memoryStore.site_settings, ...obj };
+      }
+
+      if (staffRes.rows.length > 0) staff = staffRes.rows as any;
+      if (faqsRes.rows.length > 0) faqs = faqsRes.rows as any;
+      if (highlightsRes.rows.length > 0) highlights = highlightsRes.rows as any;
+      if (articlesRes.rows.length > 0) articles = articlesRes.rows as any;
+      if (templatesRes.rows.length > 0) templates = templatesRes.rows as any;
+    } catch {
+      // Graceful fallback to memoryStore
+    }
+  }
+
+  return { settings, staff, faqs, highlights, articles, templates };
 }
 
 export async function processAiChat(message: string, clientIp: string) {
@@ -78,7 +111,7 @@ export async function processAiChat(message: string, clientIp: string) {
   // 1. Check FAQs intent match
   const matchedFaq = context.faqs.find((f) =>
     f.question.toLowerCase().split(' ').some((word) => word.length > 3 && lowerMsg.includes(word)) &&
-    (lowerMsg.includes(f.category.toLowerCase()) || lowerMsg.includes('apa') || lowerMsg.includes('bagaimana') || lowerMsg.includes('berapa') || lowerMsg.includes('kapan'))
+    (lowerMsg.includes(f.category?.toLowerCase() || '') || lowerMsg.includes('apa') || lowerMsg.includes('bagaimana') || lowerMsg.includes('berapa') || lowerMsg.includes('kapan'))
   );
 
   // 2. Intent: Wisata Air Panas & Air Terjun
@@ -102,18 +135,18 @@ export async function processAiChat(message: string, clientIp: string) {
   else if (lowerMsg.includes('penduduk') || lowerMsg.includes('jumlah kk') || lowerMsg.includes('luas') || lowerMsg.includes('dusun') || lowerMsg.includes('demografi') || lowerMsg.includes('statistik')) {
     const s = context.settings;
     reply = `Tabe! Berikut adalah ringkasan data kependudukan dan statistik administrasi resmi Desa Mantikole:\n\n` +
-      `• **Jumlah Penduduk**: ${s.total_population.toLocaleString('id-ID')} Jiwa\n` +
-      `• **Jumlah Kepala Keluarga (KK)**: ${s.total_families.toLocaleString('id-ID')} KK\n` +
-      `• **Luas Wilayah**: ${s.total_area_km2} km²\n` +
-      `• **Jumlah Dusun**: ${s.total_hamlets} Wilayah Dusun\n` +
-      `• **Produksi Panen Kakao**: ±${s.cacao_production_tons} Ton / Tahun\n` +
-      `• **Pengunjung Wisata Rata-rata**: ±${s.hotsprings_visitors_monthly.toLocaleString('id-ID')} Pengunjung / Bulan`;
+      `• **Jumlah Penduduk**: ${(s.total_population || 2145).toLocaleString('id-ID')} Jiwa\n` +
+      `• **Jumlah Kepala Keluarga (KK)**: ${(s.total_families || 582).toLocaleString('id-ID')} KK\n` +
+      `• **Luas Wilayah**: ${s.total_area_km2 || '18.45'} km²\n` +
+      `• **Jumlah Dusun**: ${s.total_hamlets || 3} Wilayah Dusun\n` +
+      `• **Produksi Panen Kakao**: ±${s.cacao_production_tons || 120} Ton / Tahun\n` +
+      `• **Pengunjung Wisata Rata-rata**: ±${(s.hotsprings_visitors_monthly || 1850).toLocaleString('id-ID')} Pengunjung / Bulan`;
     sources = ['Data Statistik & Demografi Desa Mantikole'];
   }
   // 4. Intent: Perangkat Desa / Kepala Desa / Sekdes / BPD
   else if (lowerMsg.includes('kepala desa') || lowerMsg.includes('kades') || lowerMsg.includes('sekdes') || lowerMsg.includes('sekretaris') || lowerMsg.includes('perangkat desa') || lowerMsg.includes('staf') || lowerMsg.includes('aparat')) {
     const staffText = context.staff
-      .map((st) => `• **${st.name}** — *${st.role}* (${st.desc})`)
+      .map((st) => `• **${st.name}** — *${st.role}* (${st.desc || (st as any).description || 'Perangkat Desa'})`)
       .join('\n');
     reply = `Tabe! Berikut adalah susunan Pemerintah dan Perangkat Desa Mantikole saat ini:\n\n${staffText}\n\nHubungi kantor desa pada jam kerja untuk konsultasi tatap muka.`;
     sources = ['Struktur Pemerintahan Desa Mantikole'];

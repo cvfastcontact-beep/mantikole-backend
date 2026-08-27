@@ -4,13 +4,29 @@ Dokumen ini mencatat pembaruan arsitektur backend untuk mendukung sistem **100% 
 
 ---
 
-## 1. Otomasi RAG AI Tanpa Form Manual Input (`src/services/ai.service.ts`)
+## 1. Modularisasi Database Configuration & Mock Store Separation (`src/config/db.ts` & `src/config/memoryStore.ts`)
+
+### WHY (Mengapa)
+Sebelumnya file `db.ts` berisi konfigurasi koneksi pool PostgreSQL sekaligus 280+ baris data mock *fallback* in-memory. Hal ini melanggar prinsip Single Responsibility Principle (SRP) dan membuat file konfigurasi menjadi membengkak (*godlike file*).
+
+### HOW (Bagaimana)
+- Mengekstrak dataset in-memory fallback ke dalam modul terisolasi [memoryStore.ts](file:///d:/KKN/Website/backend/src/config/memoryStore.ts).
+- Menyederhanakan [db.ts](file:///d:/KKN/Website/backend/src/config/db.ts) menjadi murni file konfigurasi pool koneksi database PostgreSQL yang ringkas (15 baris).
+
+### WHERE (Di Mana)
+- [src/config/memoryStore.ts](file:///d:/KKN/Website/backend/src/config/memoryStore.ts)
+- [src/config/db.ts](file:///d:/KKN/Website/backend/src/config/db.ts)
+- [src/db/seed.sql](file:///d:/KKN/Website/backend/src/db/seed.sql)
+
+---
+
+## 2. Otomasi RAG AI Tanpa Form Manual Input (`src/services/ai.service.ts`)
 
 ### WHY (Mengapa)
 Formulir pengisian manual AI Knowledge sebelumnya tidak praktis dan rentan inkonsistensi data. Chatbot asisten digital desa seharusnya secara otomatis mensintesis informasi terbaru dari tabel artikel warta, destinasi wisata, template surat, struktur perangkat desa, FAQ, hingga data statistik kependudukan yang aktif di database.
 
 ### HOW (Bagaimana)
-- Mengimplementasikan fungsi `buildDynamicRagContext()` pada [ai.service.ts](file:///d:/KKN/Website/backend/src/services/ai.service.ts) yang mengagregasi seluruh dataset live.
+- Mengimplementasikan fungsi `buildDynamicRagContext()` pada [ai.service.ts](file:///d:/KKN/Website/backend/src/services/ai.service.ts) yang mengagregasi seluruh dataset live dengan dukungan kueri langsung ke PostgreSQL `pool` saat aktif dan fallback ke `memoryStore`.
 - Menambahkan pencocokan maksud (*intent matching*) cerdas untuk pertanyaan seputar demografi penduduk, profil perangkat desa, persyaratan surat, tarif wisata air panas, komoditas kakao, jam buka kantor desa, hingga pencocokan pertanyaan FAQ dinamis.
 
 ### WHERE (Di Mana)
@@ -23,20 +39,16 @@ Formulir pengisian manual AI Knowledge sebelumnya tidak praktis dan rentan inkon
 ```typescript
 // src/services/ai.service.ts
 async function buildDynamicRagContext() {
-  return {
-    settings: memoryStore.site_settings,
-    staff: memoryStore.village_staff,
-    faqs: memoryStore.faqs,
-    highlights: memoryStore.village_highlights,
-    articles: memoryStore.articles.filter((a) => a.is_published),
-    templates: memoryStore.letter_templates,
-  };
+  if (pool) {
+    // Queries PostgreSQL tables in parallel (site_settings, village_staff, faqs, highlights, articles, templates)
+  }
+  return { settings, staff, faqs, highlights, articles, templates };
 }
 ```
 
 ---
 
-## 2. Layanan Pengaturan Konten Dinamis & Demografi (`src/services/settings.service.ts`)
+## 3. Layanan Pengaturan Konten Dinamis & Demografi (`src/services/settings.service.ts`)
 
 ### WHY (Mengapa)
 Seluruh elemen teks hero landing page, slogan, koordinat peta Google Maps, serta angka statistik kependudukan (jumlah penduduk, KK, luas wilayah, jumlah dusun, tonase panen kakao) harus dapat dikelola langsung oleh admin desa melalui CMS tanpa perlu menyentuh kode program.
@@ -52,7 +64,7 @@ Seluruh elemen teks hero landing page, slogan, koordinat peta Google Maps, serta
 
 ---
 
-## 3. Layanan CRUD Struktur Perangkat Desa (`src/services/staff.service.ts`)
+## 4. Layanan CRUD Struktur Perangkat Desa (`src/services/staff.service.ts`)
 
 ### WHY (Mengapa)
 Memungkinkan admin desa menambah, mengedit, atau menghapus data aparatur/perangkat desa (nama, jabatan, deskripsi tugas, URL foto, urutan tampil) secara mandiri.
@@ -68,7 +80,7 @@ Memungkinkan admin desa menambah, mengedit, atau menghapus data aparatur/perangk
 
 ---
 
-## 4. Layanan CRUD FAQ Accordion (`src/services/faq.service.ts`)
+## 5. Layanan CRUD FAQ Accordion (`src/services/faq.service.ts`)
 
 ### WHY (Mengapa)
 Menyediakan modul pengelolaan pertanyaan umum (FAQ) yang langsung tampil di beranda publik dan sekaligus menjadi basis pengetahuan jawaban AI Assistant.
