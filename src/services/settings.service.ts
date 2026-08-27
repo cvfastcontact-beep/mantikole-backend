@@ -1,6 +1,12 @@
 import { pool } from '../config/db';
+import { appCache } from '../utils/cache';
+
+const CACHE_KEY = 'site_settings:all';
 
 export async function fetchSiteSettings() {
+  const cached = appCache.get<Record<string, any>>(CACHE_KEY);
+  if (cached) return cached;
+
   const result = await pool.query('SELECT key, value FROM site_settings');
   const settingsObj: Record<string, any> = {};
 
@@ -12,6 +18,7 @@ export async function fetchSiteSettings() {
     }
   });
 
+  appCache.set(CACHE_KEY, settingsObj, 120); // 2 minutes cache
   return settingsObj;
 }
 
@@ -26,5 +33,6 @@ export async function updateSiteSettings(newSettings: Record<string, any>) {
     );
   }
 
+  appCache.del(CACHE_KEY);
   return await fetchSiteSettings();
 }

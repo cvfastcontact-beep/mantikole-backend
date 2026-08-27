@@ -1,10 +1,15 @@
 import { pool } from '../config/db';
+import { appCache } from '../utils/cache';
 
 export async function fetchHighlights(type?: string, search?: string) {
+  const cacheKey = `highlights:list:${type || 'all'}:${search || ''}`;
+  const cached = appCache.get<any[]>(cacheKey);
+  if (cached) return cached;
+
   let sql = 'SELECT * FROM village_highlights WHERE 1=1';
   const params: any[] = [];
 
-  if (type) {
+  if (type && type !== 'all') {
     params.push(type);
     sql += ` AND type = $${params.length}`;
   }
@@ -16,17 +21,26 @@ export async function fetchHighlights(type?: string, search?: string) {
 
   sql += ' ORDER BY created_at DESC';
   const result = await pool.query(sql, params);
-  return result.rows;
+  const rows = result.rows;
+
+  appCache.set(cacheKey, rows, 120);
+  return rows;
 }
 
 export async function fetchHighlightDetail(slug: string) {
+  const cacheKey = `highlights:detail:${slug}`;
+  const cached = appCache.get<any>(cacheKey);
+  if (cached) return cached;
+
   const result = await pool.query('SELECT * FROM village_highlights WHERE slug = $1', [slug]);
 
   if (result.rows.length === 0) {
     throw { status: 404, message: 'Data wisata/komoditas tidak ditemukan.' };
   }
 
-  return result.rows[0];
+  const item = result.rows[0];
+  appCache.set(cacheKey, item, 120);
+  return item;
 }
 
 export async function createHighlight(data: any) {
@@ -54,5 +68,6 @@ export async function createHighlight(data: any) {
     [id, title, slug, type, short_description, full_description, loc, lat, lng, price, gallery]
   );
 
+  appCache.del('highlights:*');
   return result.rows[0];
 }

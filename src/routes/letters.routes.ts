@@ -6,14 +6,19 @@ import {
   handleGetAdminLetterRequests,
   handleUpdateLetterStatus,
 } from '../controllers/letters.controller';
-import { authenticateToken } from '../middleware/auth.middleware';
+import { requireAuth } from '../middlewares/auth.middleware';
+import { validateBody } from '../middlewares/validate.middleware';
+import { createLetterRequestSchema, updateLetterStatusSchema } from '../validations/letter.schema';
 
 const router = Router();
 
+// Public routes
 router.get('/templates', handleGetLetterTemplates);
-router.post('/request', handleCreateLetterRequest);
+router.post('/request', validateBody(createLetterRequestSchema), handleCreateLetterRequest);
 router.get('/track/:ticket_number', handleTrackLetter);
-router.get('/requests', authenticateToken, handleGetAdminLetterRequests);
-router.patch('/requests/:id/status', authenticateToken, handleUpdateLetterStatus);
+
+// Admin-protected routes
+router.get('/requests', requireAuth, handleGetAdminLetterRequests);
+router.patch('/request/:id/status', requireAuth, validateBody(updateLetterStatusSchema), handleUpdateLetterStatus);
 
 export default router;

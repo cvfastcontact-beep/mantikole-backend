@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -13,11 +13,21 @@ import settingsRoutes from './routes/settings.routes';
 import staffRoutes from './routes/staff.routes';
 import faqRoutes from './routes/faq.routes';
 import uploadRoutes from './routes/upload.routes';
+import { globalErrorHandler } from './middlewares/error.middleware';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Security Headers Middleware (Native Standard without extra bloat)
+app.use((req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
 
 // Enable CORS for frontend connection
 app.use(
@@ -39,7 +49,7 @@ app.get('/', (req: Request, res: Response) => {
   res.json({
     name: 'Website Desa Mantikole API',
     status: 'Operational',
-    version: '1.2.0',
+    version: '1.3.0',
     timestamp: new Date().toISOString(),
   });
 });
@@ -60,6 +70,9 @@ app.use('/api/v1/upload', uploadRoutes);
 app.use((req: Request, res: Response) => {
   res.status(404).json({ success: false, message: 'Endpoint REST API tidak ditemukan.' });
 });
+
+// Centralized Global Error Handler
+app.use(globalErrorHandler);
 
 app.listen(PORT, () => {
   console.log(`🚀 Express Backend Server Website Desa Mantikole berjalan pada http://localhost:${PORT}`);

@@ -1,4 +1,5 @@
 import { pool } from '../config/db';
+import { appCache } from '../utils/cache';
 
 export interface FetchArticlesQuery {
   category?: string;
@@ -9,42 +10,72 @@ export interface FetchArticlesQuery {
 
 export async function fetchArticlesQuery(query: FetchArticlesQuery) {
   const { category, search, page = '1', limit = '10' } = query;
-  const pageNum = parseInt(page, 10);
-  const limitNum = parseInt(limit, 10);
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
+  const offset = (pageNum - 1) * limitNum;
 
-  let sql = 'SELECT a.*, u.full_name as author_name FROM articles a LEFT JOIN users u ON a.author_id = u.id WHERE a.is_published = true';
+  const cacheKey = `articles:list:${category || 'all'}:${search || ''}:${pageNum}:${limitNum}`;
+  const cached = appCache.get<any>(cacheKey);
+  if (cached) return cached;
+
+  let whereClauses = ['a.is_published = true'];
   const params: any[] = [];
 
-  if (category) {
+  if (category && category !== 'ALL') {
     params.push(category);
-    sql += ` AND a.category = $${params.length}`;
+    whereClauses.push(`a.category = $${params.length}`);
   }
 
   if (search) {
     params.push(`%${search}%`);
-    sql += ` AND (a.title ILIKE $${params.length} OR a.summary ILIKE $${params.length})`;
+    whereClauses.push(`(a.title ILIKE $${params.length} OR a.summary ILIKE $${params.length} OR a.content ILIKE $${params.length})`);
   }
 
-  sql += ' ORDER BY a.created_at DESC';
-  const result = await pool.query(sql, params);
-  const articles = result.rows;
+  const whereSql = whereClauses.join(' AND ');
 
-  const total = articles.length;
-  const startIndex = (pageNum - 1) * limitNum;
-  const paginatedArticles = articles.slice(startIndex, startIndex + limitNum);
+  // Count query
+  const countRes = await pool.query(
+    `SELECT COUNT(*) as total FROM articles a WHERE ${whereSql}`,
+    params
+  );
+  const total = parseInt(countRes.rows[0].total, 10) || 0;
 
-  return {
-    data: paginatedArticles,
+  // Paginated data query
+  params.push(limitNum);
+  const limitIdx = params.length;
+  params.push(offset);
+  const offsetIdx = params.length;
+
+  const dataSql = `
+    SELECT a.*, u.full_name as author_name 
+    FROM articles a 
+    LEFT JOIN users u ON a.author_id = u.id 
+    WHERE ${whereSql} 
+    ORDER BY a.created_at DESC 
+    LIMIT $${limitIdx} OFFSET $${offsetIdx}
+  `;
+
+  const result = await pool.query(dataSql, params);
+
+  const response = {
+    data: result.rows,
     pagination: {
       total,
       page: pageNum,
       limit: limitNum,
-      totalPages: Math.ceil(total / limitNum),
+      totalPages: Math.ceil(total / limitNum) || 1,
     },
   };
+
+  appCache.set(cacheKey, response, 60); // 60s cache
+  return response;
 }
 
 export async function fetchArticleDetail(idOrSlug: string) {
+  const cacheKey = `articles:detail:${idOrSlug}`;
+  const cached = appCache.get<any>(cacheKey);
+  if (cached) return cached;
+
   const result = await pool.query(
     'SELECT a.*, u.full_name as author_name FROM articles a LEFT JOIN users u ON a.author_id = u.id WHERE a.id = $1 OR a.slug = $1 OR a.id ILIKE $2',
     [idOrSlug, `%${idOrSlug}%`]
@@ -57,15 +88,12 @@ export async function fetchArticleDetail(idOrSlug: string) {
   const article = result.rows[0];
   await pool.query('UPDATE articles SET views_count = views_count + 1 WHERE id = $1', [article.id]).catch(() => null);
 
+  appCache.set(cacheKey, article, 60);
   return article;
 }
 
 export async function createArticle(data: any, author: { id?: string; username?: string }) {
   const { title, content, summary, category, featured_image_url, is_published } = data;
-
-  if (!title || !content || !category) {
-    throw { status: 400, message: 'Judul, konten, dan kategori wajib diisi.' };
-  }
 
   const slug = title
     .toLowerCase()
@@ -74,7 +102,7 @@ export async function createArticle(data: any, author: { id?: string; username?:
 
   const id = `art-${Date.now()}`;
   const computedSummary = summary || content.slice(0, 150) + '...';
-  const image = featured_image_url || 'https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&w=1200&q=80';
+  const image = featured_image_url || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1200&q=80';
   const authorId = author.id || '00000000-0000-0000-0000-000000000001';
   const published = is_published !== undefined ? is_published : true;
 
@@ -84,6 +112,7 @@ export async function createArticle(data: any, author: { id?: string; username?:
     [id, title, slug, content, computedSummary, category, image, authorId, published]
   );
 
+  appCache.del('articles:*');
   return result.rows[0];
 }
 
@@ -107,6 +136,7 @@ export async function updateArticle(id: string, data: any) {
     throw { status: 404, message: 'Artikel tidak ditemukan.' };
   }
 
+  appCache.del('articles:*');
   return res.rows[0];
 }
 
@@ -115,4 +145,5 @@ export async function deleteArticle(id: string) {
   if (res.rowCount === 0) {
     throw { status: 404, message: 'Artikel tidak ditemukan.' };
   }
+  appCache.del('articles:*');
 }

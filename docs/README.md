@@ -14,6 +14,7 @@ Seluruh dokumentasi disusun berdasarkan tanggal dan judul fitur sesuai perkemban
 | **2026-08-25** | [`2026-08-25-fitur-cms-dinamis-dan-otomasi-rag-ai.md`](./2026-08-25-fitur-cms-dinamis-dan-otomasi-rag-ai.md) | Endpoint settings, staff, dan faqs untuk CMS 100% dinamis serta otomasi penuh context RAG AI langsung dari live database. |
 | **2026-08-27** | [`2026-08-27-migrasi-dan-integrasi-neon-postgresql.md`](./2026-08-27-migrasi-dan-integrasi-neon-postgresql.md) | Integrasi penuh Neon Lakebase Postgres (IaC neon.ts, CLI linkage, automated migration & live seeding). |
 | **2026-08-27** | [`2026-08-27-integrasi-neon-object-storage.md`](./2026-08-27-integrasi-neon-object-storage.md) | Integrasi Neon Object Storage (Bucket `mantikole-media`), REST API upload endpoint, dan komponen `ImageUploader` di CMS. |
+| **2026-08-27** | [`2026-08-27-penguatan-arsitektur-caching-dan-keamanan-zod.md`](./2026-08-27-penguatan-arsitektur-caching-dan-keamanan-zod.md) | In-memory TTL Caching (<1ms latency), Auto-Invalidation, Validasi Zod terpusat, Sanitasi XSS, dan SQL Paginasi. |
 
 ---
 

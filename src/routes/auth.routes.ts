@@ -1,10 +1,11 @@
 import { Router } from 'express';
-import { handleLogin, handleGetMe } from '../controllers/auth.controller';
-import { authenticateToken } from '../middleware/auth.middleware';
+import { handleLogin } from '../controllers/auth.controller';
+import { validateBody } from '../middlewares/validate.middleware';
+import { loginSchema } from '../validations/auth.schema';
 
 const router = Router();
 
-router.post('/login', handleLogin);
-router.get('/me', authenticateToken, handleGetMe);
+// POST /api/v1/auth/login
+router.post('/login', validateBody(loginSchema), handleLogin);
 
 export default router;

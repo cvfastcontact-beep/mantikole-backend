@@ -6,14 +6,19 @@ import {
   handleUpdateArticle,
   handleDeleteArticle,
 } from '../controllers/articles.controller';
-import { authenticateToken } from '../middleware/auth.middleware';
+import { requireAuth } from '../middlewares/auth.middleware';
+import { validateBody } from '../middlewares/validate.middleware';
+import { createArticleSchema, updateArticleSchema } from '../validations/article.schema';
 
 const router = Router();
 
+// Public routes
 router.get('/', handleGetArticles);
 router.get('/:idOrSlug', handleGetArticleDetail);
-router.post('/', authenticateToken, handleCreateArticle);
-router.put('/:id', authenticateToken, handleUpdateArticle);
-router.delete('/:id', authenticateToken, handleDeleteArticle);
+
+// Admin routes
+router.post('/', requireAuth, validateBody(createArticleSchema), handleCreateArticle);
+router.put('/:id', requireAuth, validateBody(updateArticleSchema), handleUpdateArticle);
+router.delete('/:id', requireAuth, handleDeleteArticle);
 
 export default router;

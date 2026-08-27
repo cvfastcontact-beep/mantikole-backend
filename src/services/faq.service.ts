@@ -1,8 +1,17 @@
 import { pool } from '../config/db';
+import { appCache } from '../utils/cache';
+
+const CACHE_KEY = 'faqs:all';
 
 export async function fetchAllFaqs() {
+  const cached = appCache.get<any[]>(CACHE_KEY);
+  if (cached) return cached;
+
   const result = await pool.query('SELECT * FROM faqs ORDER BY order_index ASC, created_at ASC');
-  return result.rows;
+  const faqs = result.rows;
+
+  appCache.set(CACHE_KEY, faqs, 120);
+  return faqs;
 }
 
 export async function createFaq(data: any) {
@@ -21,6 +30,7 @@ export async function createFaq(data: any) {
     [id, question, answer, cat, order]
   );
 
+  appCache.del(CACHE_KEY);
   return result.rows[0];
 }
 
@@ -41,6 +51,7 @@ export async function updateFaq(id: string, data: any) {
     throw { status: 404, message: 'Data FAQ tidak ditemukan.' };
   }
 
+  appCache.del(CACHE_KEY);
   return result.rows[0];
 }
 
@@ -49,4 +60,5 @@ export async function deleteFaq(id: string) {
   if (result.rowCount === 0) {
     throw { status: 404, message: 'Data FAQ tidak ditemukan.' };
   }
+  appCache.del(CACHE_KEY);
 }
