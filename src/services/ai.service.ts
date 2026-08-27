@@ -1,4 +1,4 @@
-import { memoryStore, pool } from '../config/db';
+import { pool } from '../config/db';
 
 const ipRequestCounts: Map<string, { count: number; resetTime: number }> = new Map();
 
@@ -23,58 +23,36 @@ export const checkRateLimit = (ip: string): boolean => {
 
 /**
  * Real-time RAG Context Synthesizer:
- * Aggregates all live database entities (Settings, Staff, FAQs, Highlights, Articles, Services)
+ * Aggregates all live database entities from Neon PostgreSQL
  * into a structured dynamic knowledge graph for accurate query answering.
  */
-async function buildDynamicRagContext(): Promise<{
-  settings: typeof memoryStore.site_settings;
-  staff: typeof memoryStore.village_staff;
-  faqs: typeof memoryStore.faqs;
-  highlights: typeof memoryStore.village_highlights;
-  articles: typeof memoryStore.articles;
-  templates: typeof memoryStore.letter_templates;
-}> {
-  let settings = memoryStore.site_settings;
-  let staff = memoryStore.village_staff;
-  let faqs = memoryStore.faqs;
-  let highlights = memoryStore.village_highlights;
-  let articles = memoryStore.articles.filter((a) => a.is_published);
-  let templates = memoryStore.letter_templates;
+async function buildDynamicRagContext() {
+  const [settingsRes, staffRes, faqsRes, highlightsRes, articlesRes, templatesRes] = await Promise.all([
+    pool.query('SELECT key, value FROM site_settings'),
+    pool.query('SELECT * FROM village_staff ORDER BY order_index ASC'),
+    pool.query('SELECT * FROM faqs ORDER BY order_index ASC'),
+    pool.query('SELECT * FROM village_highlights'),
+    pool.query('SELECT * FROM articles WHERE is_published = true'),
+    pool.query('SELECT * FROM letter_templates'),
+  ]);
 
-  if (pool) {
+  const settings: Record<string, any> = {};
+  settingsRes.rows.forEach((r) => {
     try {
-      const [settingsRes, staffRes, faqsRes, highlightsRes, articlesRes, templatesRes] = await Promise.all([
-        pool.query('SELECT key, value FROM site_settings').catch(() => ({ rows: [] })),
-        pool.query('SELECT * FROM village_staff ORDER BY order_index ASC').catch(() => ({ rows: [] })),
-        pool.query('SELECT * FROM faqs ORDER BY order_index ASC').catch(() => ({ rows: [] })),
-        pool.query('SELECT * FROM village_highlights').catch(() => ({ rows: [] })),
-        pool.query('SELECT * FROM articles WHERE is_published = true').catch(() => ({ rows: [] })),
-        pool.query('SELECT * FROM letter_templates').catch(() => ({ rows: [] })),
-      ]);
-
-      if (settingsRes.rows.length > 0) {
-        const obj: Record<string, any> = {};
-        settingsRes.rows.forEach((r) => {
-          try {
-            obj[r.key] = JSON.parse(r.value);
-          } catch {
-            obj[r.key] = r.value;
-          }
-        });
-        settings = { ...memoryStore.site_settings, ...obj };
-      }
-
-      if (staffRes.rows.length > 0) staff = staffRes.rows as any;
-      if (faqsRes.rows.length > 0) faqs = faqsRes.rows as any;
-      if (highlightsRes.rows.length > 0) highlights = highlightsRes.rows as any;
-      if (articlesRes.rows.length > 0) articles = articlesRes.rows as any;
-      if (templatesRes.rows.length > 0) templates = templatesRes.rows as any;
+      settings[r.key] = JSON.parse(r.value);
     } catch {
-      // Graceful fallback to memoryStore
+      settings[r.key] = r.value;
     }
-  }
+  });
 
-  return { settings, staff, faqs, highlights, articles, templates };
+  return {
+    settings,
+    staff: staffRes.rows,
+    faqs: faqsRes.rows,
+    highlights: highlightsRes.rows,
+    articles: articlesRes.rows,
+    templates: templatesRes.rows,
+  };
 }
 
 export async function processAiChat(message: string, clientIp: string) {
@@ -103,28 +81,28 @@ export async function processAiChat(message: string, clientIp: string) {
     };
   }
 
-  // Load Real-time Data Context
+  // Load Real-time Data Context from PostgreSQL
   const context = await buildDynamicRagContext();
   let reply = '';
   let sources: string[] = [];
 
   // 1. Check FAQs intent match
-  const matchedFaq = context.faqs.find((f) =>
-    f.question.toLowerCase().split(' ').some((word) => word.length > 3 && lowerMsg.includes(word)) &&
+  const matchedFaq = context.faqs.find((f: any) =>
+    f.question.toLowerCase().split(' ').some((word: string) => word.length > 3 && lowerMsg.includes(word)) &&
     (lowerMsg.includes(f.category?.toLowerCase() || '') || lowerMsg.includes('apa') || lowerMsg.includes('bagaimana') || lowerMsg.includes('berapa') || lowerMsg.includes('kapan'))
   );
 
   // 2. Intent: Wisata Air Panas & Air Terjun
   if (lowerMsg.includes('air panas') || lowerMsg.includes('pemandian') || lowerMsg.includes('belerang')) {
-    const airPanas = context.highlights.find((h) => h.type === 'wisata' && h.title.toLowerCase().includes('panas')) || context.highlights[0];
-    reply = `Tabe! **${airPanas.title}** adalah destinasi wisata unggulan di Desa Mantikole, Kecamatan Dolo Barat, Kabupaten Sigi.\n\n` +
-      `• **Tarif Tiket**: ${airPanas.price_info || 'Rp 5.000 / Orang'}\n` +
-      `• **Lokasi**: ${airPanas.location_details}\n` +
-      `• **Khasiat & Keunggulan**: ${airPanas.short_description}\n\n` +
-      `📌 ${airPanas.full_description.slice(0, 200)}...`;
-    sources = [airPanas.title, 'Katalog Wisata Desa Mantikole'];
+    const airPanas = context.highlights.find((h: any) => h.type === 'wisata' && h.title.toLowerCase().includes('panas')) || context.highlights[0];
+    reply = `Tabe! **${airPanas?.title || 'Pemandian Air Panas Alami Mantikole'}** adalah destinasi wisata unggulan di Desa Mantikole, Kecamatan Dolo Barat, Kabupaten Sigi.\n\n` +
+      `• **Tarif Tiket**: ${airPanas?.price_info || 'Rp 5.000 / Orang'}\n` +
+      `• **Lokasi**: ${airPanas?.location_details || 'Desa Mantikole, Dolo Barat, Sigi'}\n` +
+      `• **Khasiat & Keunggulan**: ${airPanas?.short_description || 'Mata air panas alami berkhasiat kesehatan'}\n\n` +
+      `📌 ${airPanas?.full_description?.slice(0, 200) || ''}...`;
+    sources = [airPanas?.title || 'Pemandian Air Panas Alami Mantikole', 'Katalog Wisata Desa Mantikole'];
   } else if (lowerMsg.includes('air terjun') || lowerMsg.includes('curug')) {
-    const airTerjun = context.highlights.find((h) => h.title.toLowerCase().includes('terjun')) || context.highlights[1];
+    const airTerjun = context.highlights.find((h: any) => h.title.toLowerCase().includes('terjun')) || context.highlights[1];
     reply = `Tabe! **${airTerjun?.title || 'Wisata Air Terjun Mantikole'}** menyuguhkan pesona gemericik air pegunungan yang jernih di tengah hutan tropis Dolo Barat.\n\n` +
       `• **Biaya Masuk**: ${airTerjun?.price_info || 'Gratis / Donasi Kebersihan'}\n` +
       `• **Lokasi**: ${airTerjun?.location_details || 'Pegunungan Mantikole'}\n` +
@@ -146,7 +124,7 @@ export async function processAiChat(message: string, clientIp: string) {
   // 4. Intent: Perangkat Desa / Kepala Desa / Sekdes / BPD
   else if (lowerMsg.includes('kepala desa') || lowerMsg.includes('kades') || lowerMsg.includes('sekdes') || lowerMsg.includes('sekretaris') || lowerMsg.includes('perangkat desa') || lowerMsg.includes('staf') || lowerMsg.includes('aparat')) {
     const staffText = context.staff
-      .map((st) => `• **${st.name}** — *${st.role}* (${st.desc || (st as any).description || 'Perangkat Desa'})`)
+      .map((st: any) => `• **${st.name}** — *${st.role}* (${st.description || st.desc || 'Perangkat Desa'})`)
       .join('\n');
     reply = `Tabe! Berikut adalah susunan Pemerintah dan Perangkat Desa Mantikole saat ini:\n\n${staffText}\n\nHubungi kantor desa pada jam kerja untuk konsultasi tatap muka.`;
     sources = ['Struktur Pemerintahan Desa Mantikole'];
@@ -154,7 +132,7 @@ export async function processAiChat(message: string, clientIp: string) {
   // 5. Intent: Surat Mandiri & Syarat Dokumen
   else if (lowerMsg.includes('surat') || lowerMsg.includes('sku') || lowerMsg.includes('skd') || lowerMsg.includes('sktm') || lowerMsg.includes('resi') || lowerMsg.includes('syarat')) {
     const tplList = context.templates
-      .map((t) => `• **${t.title} (${t.code})**: Syarat -> ${t.requirements.join(', ')}`)
+      .map((t: any) => `• **${t.title} (${t.code})**: Syarat -> ${(t.requirements || []).join(', ')}`)
       .join('\n\n');
     reply = `Tabe! Pelayanan surat administrasi Desa Mantikole dapat diajukan secara online 24 jam tanpa perlu mengantre melalui menu **Layanan Surat**.\n\n` +
       `📌 **Jenis Surat & Persyaratan Berkas**:\n${tplList}\n\n` +
@@ -163,9 +141,9 @@ export async function processAiChat(message: string, clientIp: string) {
   }
   // 6. Intent: Komoditas / Kakao / Cengkeh / Pertanian
   else if (lowerMsg.includes('kakao') || lowerMsg.includes('cokelat') || lowerMsg.includes('cengkeh') || lowerMsg.includes('kelapa') || lowerMsg.includes('komoditas') || lowerMsg.includes('kebun') || lowerMsg.includes('panen')) {
-    const commodities = context.highlights.filter((h) => h.type === 'komoditas');
+    const commodities = context.highlights.filter((h: any) => h.type === 'komoditas');
     const commText = commodities
-      .map((c) => `• **${c.title}**: ${c.short_description} (${c.price_info})`)
+      .map((c: any) => `• **${c.title}**: ${c.short_description} (${c.price_info})`)
       .join('\n\n');
     reply = `Tabe! Desa Mantikole memiliki potensi agrikultur dan perkebunan yang sangat subur di lembah Dolo Barat:\n\n${commText}\n\nKomoditas kakao Mantikole difermentasi dengan standar industri untuk menjaga kualitas rasa dan aroma terbaik.`;
     sources = ['Katalog Potensi Komoditas Desa Mantikole'];
@@ -174,10 +152,10 @@ export async function processAiChat(message: string, clientIp: string) {
   else if (lowerMsg.includes('kantor') || lowerMsg.includes('jam') || lowerMsg.includes('buka') || lowerMsg.includes('telepon') || lowerMsg.includes('kontak') || lowerMsg.includes('alamat')) {
     const s = context.settings;
     reply = `Tabe! Berikut informasi operasional dan kontak Kantor Desa Mantikole:\n\n` +
-      `• **Alamat**: ${s.village_location_text}\n` +
-      `• **Jam Pelayanan Kantor**: ${s.office_hours}\n` +
-      `• **Nomor Telepon/WA**: ${s.contact_phone}\n` +
-      `• **Email**: ${s.contact_email}\n` +
+      `• **Alamat**: ${s.village_location_text || 'Desa Mantikole, Dolo Barat, Sigi'}\n` +
+      `• **Jam Pelayanan Kantor**: ${s.office_hours || 'Senin - Jumat, 08:00 - 15:00 WITA'}\n` +
+      `• **Nomor Telepon/WA**: ${s.contact_phone || '0812-3456-7890'}\n` +
+      `• **Email**: ${s.contact_email || 'kantor@desamantikole.id'}\n` +
       `• **Layanan Online**: Aktif 24 Jam melalui Website Resmi`;
     sources = ['Profil Kontak Kantor Desa Mantikole'];
   }
@@ -185,7 +163,7 @@ export async function processAiChat(message: string, clientIp: string) {
   else if (lowerMsg.includes('berita') || lowerMsg.includes('kegiatan') || lowerMsg.includes('warta') || lowerMsg.includes('pembangunan') || lowerMsg.includes('pengumuman')) {
     const latestArticles = context.articles.slice(0, 3);
     const artText = latestArticles
-      .map((a) => `• **${a.title}** [${a.category}]\n  *${a.summary}*`)
+      .map((a: any) => `• **${a.title}** [${a.category}]\n  *${a.summary}*`)
       .join('\n\n');
     reply = `Tabe! Berikut adalah publikasi warta dan pengumuman terbaru dari Desa Mantikole:\n\n${artText}\n\nBuka menu **Berita** untuk membaca seluruh artikel secara lengkap.`;
     sources = ['Warta & Berita Desa Mantikole'];

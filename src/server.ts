@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
 
 import authRoutes from './routes/auth.routes';
 import articlesRoutes from './routes/articles.routes';
@@ -11,6 +12,7 @@ import adminRoutes from './routes/admin.routes';
 import settingsRoutes from './routes/settings.routes';
 import staffRoutes from './routes/staff.routes';
 import faqRoutes from './routes/faq.routes';
+import uploadRoutes from './routes/upload.routes';
 
 dotenv.config();
 
@@ -29,12 +31,15 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Serve local uploads folder if fallback is used
+app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
+
 // Root Health Check Route
 app.get('/', (req: Request, res: Response) => {
   res.json({
     name: 'Website Desa Mantikole API',
     status: 'Operational',
-    version: '1.1.0',
+    version: '1.2.0',
     timestamp: new Date().toISOString(),
   });
 });
@@ -49,6 +54,7 @@ app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/staff', staffRoutes);
 app.use('/api/v1/faqs', faqRoutes);
+app.use('/api/v1/upload', uploadRoutes);
 
 // 404 Route Handler
 app.use((req: Request, res: Response) => {

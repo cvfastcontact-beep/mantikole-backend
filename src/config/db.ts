@@ -1,16 +1,15 @@
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
-import { memoryStore } from './memoryStore';
 
 dotenv.config();
 
 const connectionString = process.env.DATABASE_URL;
 
-export const pool = connectionString
-  ? new Pool({
-      connectionString,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
-    })
-  : null;
+if (!connectionString) {
+  console.warn('⚠️ WARNING: DATABASE_URL tidak ditemukan di file .env. Pastikan koneksi Neon PostgreSQL telah dikonfigurasi.');
+}
 
-export { memoryStore };
+export const pool = new Pool({
+  connectionString: connectionString || 'postgresql://localhost:5432/mantikole_db',
+  ssl: { rejectUnauthorized: false },
+});

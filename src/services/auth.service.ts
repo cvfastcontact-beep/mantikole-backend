@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { memoryStore, pool } from '../config/db';
+import { pool } from '../config/db';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'mantikole_secret_key_2026';
 
@@ -9,16 +9,8 @@ export async function loginUser(username: string, password: string) {
     throw { status: 400, message: 'Username dan password wajib diisi.' };
   }
 
-  let user: any = null;
-
-  if (pool) {
-    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
-    if (result.rows.length > 0) {
-      user = result.rows[0];
-    }
-  } else {
-    user = memoryStore.users.find((u) => u.username === username);
-  }
+  const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+  const user = result.rows[0];
 
   if (!user) {
     throw { status: 401, message: 'Username atau password salah.' };

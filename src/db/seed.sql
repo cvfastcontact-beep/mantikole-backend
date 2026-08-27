@@ -34,12 +34,12 @@ ON CONFLICT (key) DO NOTHING;
 -- 3. SEED VILLAGE STAFF (PERANGKAT DESA)
 INSERT INTO village_staff (id, name, role, description, image_url, order_index)
 VALUES
-('staff-1', 'Drs. H. Moh. Rizal', 'Kepala Desa', 'Pemimpin Pemerintah Desa Mantikole', '/images/perangkat/kepala_desa.png', 1),
-('staff-2', 'Ahmad Subagyo, S.Sos', 'Sekretaris Desa', 'Koordinator Administrasi & Keuangan', '/images/perangkat/sekretaris_desa.png', 2),
-('staff-3', 'Ir. Hendra Prasetyo', 'Ketua BPD', 'Badan Permusyawaratan Desa', '/images/perangkat/ketua_bpd.png', 3),
-('staff-4', 'Siti Rahmawati, S.E', 'Kaur Keuangan', 'Pengelola Anggaran & Keuangan Desa', '/images/perangkat/kaur_keuangan.png', 4),
-('staff-5', 'Rahmat Hidayat, S.IP', 'Kasi Pemerintahan', 'Pelayanan Publik & Tataprama Desa', '/images/perangkat/kasi_pemerintahan.png', 5)
-ON CONFLICT (id) DO NOTHING;
+('00000000-0000-0000-0000-000000000011', 'Drs. H. Moh. Rizal', 'Kepala Desa', 'Pemimpin Pemerintah Desa Mantikole', 'https://br-purple-glade-axvd3fli.storage.c-4.us-east-2.aws.neon.tech/mantikole-media/staff/kepala_desa.png', 1),
+('00000000-0000-0000-0000-000000000012', 'Ahmad Subagyo, S.Sos', 'Sekretaris Desa', 'Koordinator Administrasi & Keuangan', 'https://br-purple-glade-axvd3fli.storage.c-4.us-east-2.aws.neon.tech/mantikole-media/staff/sekretaris_desa.png', 2),
+('00000000-0000-0000-0000-000000000013', 'Ir. Hendra Prasetyo', 'Ketua BPD', 'Badan Permusyawaratan Desa', 'https://br-purple-glade-axvd3fli.storage.c-4.us-east-2.aws.neon.tech/mantikole-media/staff/ketua_bpd.png', 3),
+('00000000-0000-0000-0000-000000000014', 'Siti Rahmawati, S.E', 'Kaur Keuangan', 'Pengelola Anggaran & Keuangan Desa', 'https://br-purple-glade-axvd3fli.storage.c-4.us-east-2.aws.neon.tech/mantikole-media/staff/kaur_keuangan.png', 4),
+('00000000-0000-0000-0000-000000000015', 'Rahmat Hidayat, S.IP', 'Kasi Pemerintahan', 'Pelayanan Publik & Tataprama Desa', 'https://br-purple-glade-axvd3fli.storage.c-4.us-east-2.aws.neon.tech/mantikole-media/staff/kasi_pemerintahan.png', 5)
+ON CONFLICT (id) DO UPDATE SET image_url = EXCLUDED.image_url;
 
 -- 4. SEED FAQS
 INSERT INTO faqs (id, question, answer, category, order_index)
@@ -66,8 +66,7 @@ VALUES
     119.83220000,
     'Rp 5.000 / Orang',
     ARRAY[
-        'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1584132967334-10e028bd69f7?auto=format&fit=crop&w=1200&q=80'
+        'https://br-purple-glade-axvd3fli.storage.c-4.us-east-2.aws.neon.tech/mantikole-media/wisata/air-panas-mantikole.jpg'
     ]
 ),
 (
@@ -82,8 +81,7 @@ VALUES
     119.83510000,
     'Gratis / Donasi Kebersihan',
     ARRAY[
-        'https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80'
+        'https://br-purple-glade-axvd3fli.storage.c-4.us-east-2.aws.neon.tech/mantikole-media/wisata/air-terjun-mantikole.jpg'
     ]
 ),
 (
@@ -98,7 +96,7 @@ VALUES
     119.82900000,
     'Rp 35.000 / Kg (Biji Kering)',
     ARRAY[
-        'https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?auto=format&fit=crop&w=1200&q=80'
+        'https://br-purple-glade-axvd3fli.storage.c-4.us-east-2.aws.neon.tech/mantikole-media/komoditas/perkebunan-kakao.jpg'
     ]
 ),
 (
@@ -113,9 +111,9 @@ VALUES
     119.82800000,
     'Variatif sesuai pasar',
     ARRAY[
-        'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=1200&q=80'
+        'https://br-purple-glade-axvd3fli.storage.c-4.us-east-2.aws.neon.tech/mantikole-media/komoditas/cengkeh-kelapa.jpg'
     ]
-) ON CONFLICT (slug) DO NOTHING;
+) ON CONFLICT (slug) DO UPDATE SET gallery_urls = EXCLUDED.gallery_urls;
 
 -- 6. SEED ARTICLES
 INSERT INTO articles (id, title, slug, content, summary, category, featured_image_url, author_id, is_published, views_count)
@@ -127,7 +125,7 @@ VALUES
     'Pemerintah Desa Mantikole bersama Tim KKN menginisiasi program revitalisasi fasilitas Pemandian Air Panas Alami Mantikole. Program ini mencakup penataan area sanitasi, penyediaan fasilitas informasi digital berbasis QR code, serta peningkatan aksesibilitas bagi pengunjung.',
     'Pemerintah Desa Mantikole bersama Tim KKN merevitalisasi fasilitas Pemandian Air Panas Alami berbasis ekowisata dan integrasi informasi digital.',
     'Pembangunan',
-    'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1200&q=80',
+    'https://br-purple-glade-axvd3fli.storage.c-4.us-east-2.aws.neon.tech/mantikole-media/articles/ekowisata-air-panas.jpg',
     '00000000-0000-0000-0000-000000000001',
     true,
     142
@@ -139,7 +137,7 @@ VALUES
     'Untuk mempermudah kepengurusan surat keterangan usaha, domisili, dan surat keterangan tidak mampu, Desa Mantikole kini meluncurkan portal layanan surat mandiri secara online. Warga cukup mengunggah identitas dan melacak pengajuan melalui nomor tiket resi unik.',
     'Desa Mantikole merilis portal pengajuan surat mandiri berbasis nomor resi unik tanpa perlu mengantre lama di kantor desa.',
     'Pengumuman',
-    'https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&w=1200&q=80',
+    'https://br-purple-glade-axvd3fli.storage.c-4.us-east-2.aws.neon.tech/mantikole-media/articles/portal-administrasi-surat.jpg',
     '00000000-0000-0000-0000-000000000001',
     true,
     98
@@ -151,11 +149,11 @@ VALUES
     'Upaya mendorong perekonomian desa dilakukan melalui sosialisasi teknik fermentasi biji kakao modern agar nilai jual di tingkat kelompok tani semakin meningkat.',
     'Sosialisasi teknik fermentasi biji kakao modern digelar untuk meningkatkan daya saing hasil panen petani kakao Mantikole.',
     'Edukasi',
-    'https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?auto=format&fit=crop&w=1200&q=80',
+    'https://br-purple-glade-axvd3fli.storage.c-4.us-east-2.aws.neon.tech/mantikole-media/articles/pendampingan-petani-kakao.jpg',
     '00000000-0000-0000-0000-000000000001',
     true,
     76
-) ON CONFLICT (slug) DO NOTHING;
+) ON CONFLICT (slug) DO UPDATE SET featured_image_url = EXCLUDED.featured_image_url;
 
 -- 7. SEED LETTER TEMPLATES
 INSERT INTO letter_templates (id, title, code, description, file_url, requirements)

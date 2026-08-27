@@ -1,4 +1,4 @@
-import { memoryStore, pool } from '../config/db';
+import { pool } from '../config/db';
 
 export const generateTicketNumber = () => {
   const year = new Date().getFullYear();
@@ -7,14 +7,8 @@ export const generateTicketNumber = () => {
 };
 
 export async function fetchLetterTemplates() {
-  let templates: any[] = [];
-  if (pool) {
-    const result = await pool.query('SELECT * FROM letter_templates ORDER BY title ASC');
-    templates = result.rows;
-  } else {
-    templates = memoryStore.letter_templates;
-  }
-  return templates;
+  const result = await pool.query('SELECT * FROM letter_templates ORDER BY title ASC');
+  return result.rows;
 }
 
 export async function createLetterRequest(data: any) {
@@ -34,116 +28,58 @@ export async function createLetterRequest(data: any) {
     };
   }
 
+  const id = `req-${Date.now()}`;
   const ticket_number = generateTicketNumber();
-  const newRequest = {
-    id: `req-${Date.now()}`,
-    ticket_number,
-    applicant_nik,
-    applicant_name,
-    applicant_phone,
-    applicant_address,
-    letter_type_code,
-    attachment_urls: attachment_urls || [],
-    status: 'PENDING',
-    admin_notes: 'Pengajuan surat baru. Menunggu proses verifikasi berkas oleh perangkat desa.',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
+  const admin_notes = 'Pengajuan surat baru. Menunggu proses verifikasi berkas oleh perangkat desa.';
+  const attachments = attachment_urls || [];
 
-  if (pool) {
-    await pool.query(
-      `INSERT INTO letter_requests 
-       (id, ticket_number, applicant_nik, applicant_name, applicant_phone, applicant_address, letter_type_code, attachment_urls, status, admin_notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-      [
-        newRequest.id,
-        ticket_number,
-        applicant_nik,
-        applicant_name,
-        applicant_phone,
-        applicant_address,
-        letter_type_code,
-        attachment_urls || [],
-        'PENDING',
-        newRequest.admin_notes,
-      ]
-    );
-  } else {
-    memoryStore.letter_requests.unshift(newRequest);
-  }
+  const result = await pool.query(
+    `INSERT INTO letter_requests 
+     (id, ticket_number, applicant_nik, applicant_name, applicant_phone, applicant_address, letter_type_code, attachment_urls, status, admin_notes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+    [id, ticket_number, applicant_nik, applicant_name, applicant_phone, applicant_address, letter_type_code, attachments, 'PENDING', admin_notes]
+  );
 
+  const row = result.rows[0];
   return {
-    ticket_number,
-    status: newRequest.status,
-    applicant_name,
-    letter_type_code,
-    created_at: newRequest.created_at,
+    ticket_number: row.ticket_number,
+    status: row.status,
+    applicant_name: row.applicant_name,
+    letter_type_code: row.letter_type_code,
+    created_at: row.created_at,
   };
 }
 
 export async function trackLetterByTicket(ticketNumber: string) {
-  let requestItem: any = null;
+  const result = await pool.query('SELECT * FROM letter_requests WHERE ticket_number = $1', [ticketNumber.trim()]);
 
-  if (pool) {
-    const result = await pool.query('SELECT * FROM letter_requests WHERE ticket_number = $1', [ticketNumber.trim()]);
-    if (result.rows.length > 0) {
-      requestItem = result.rows[0];
-    }
-  } else {
-    requestItem = memoryStore.letter_requests.find(
-      (r) => r.ticket_number.toUpperCase() === ticketNumber.trim().toUpperCase()
-    );
-  }
-
-  if (!requestItem) {
+  if (result.rows.length === 0) {
     throw {
       status: 404,
       message: 'Nomor Tiket Resi tidak ditemukan. Pastikan Anda memasukkan kode dengan benar (contoh: MNT-2026-08001).',
     };
   }
 
-  return requestItem;
+  return result.rows[0];
 }
 
 export async function fetchAdminLetterRequests(status?: string, search?: string) {
-  let requests: any[] = [];
+  let sql = 'SELECT * FROM letter_requests WHERE 1=1';
+  const params: any[] = [];
 
-  if (pool) {
-    let sql = 'SELECT * FROM letter_requests WHERE 1=1';
-    const params: any[] = [];
-
-    if (status) {
-      params.push(status);
-      sql += ` AND status = $${params.length}`;
-    }
-
-    if (search) {
-      params.push(`%${search}%`);
-      sql += ` AND (ticket_number ILIKE $${params.length} OR applicant_name ILIKE $${params.length} OR applicant_nik ILIKE $${params.length})`;
-    }
-
-    sql += ' ORDER BY created_at DESC';
-    const result = await pool.query(sql, params);
-    requests = result.rows;
-  } else {
-    requests = [...memoryStore.letter_requests];
-
-    if (status) {
-      requests = requests.filter((r) => r.status.toUpperCase() === status.toUpperCase());
-    }
-
-    if (search) {
-      const q = search.toLowerCase();
-      requests = requests.filter(
-        (r) =>
-          r.ticket_number.toLowerCase().includes(q) ||
-          r.applicant_name.toLowerCase().includes(q) ||
-          r.applicant_nik.includes(q)
-      );
-    }
+  if (status) {
+    params.push(status);
+    sql += ` AND status = $${params.length}`;
   }
 
-  return requests;
+  if (search) {
+    params.push(`%${search}%`);
+    sql += ` AND (ticket_number ILIKE $${params.length} OR applicant_name ILIKE $${params.length} OR applicant_nik ILIKE $${params.length})`;
+  }
+
+  sql += ' ORDER BY created_at DESC';
+  const result = await pool.query(sql, params);
+  return result.rows;
 }
 
 export async function updateLetterRequestStatus(id: string, status: string, admin_notes?: string) {
@@ -151,29 +87,14 @@ export async function updateLetterRequestStatus(id: string, status: string, admi
     throw { status: 400, message: 'Status tidak valid. Harus PENDING, PROCESSED, COMPLETED, atau REJECTED.' };
   }
 
-  if (!pool) {
-    const index = memoryStore.letter_requests.findIndex((r) => r.id === id);
-    if (index === -1) {
-      throw { status: 404, message: 'Pengajuan surat tidak ditemukan.' };
-    }
+  const result = await pool.query(
+    'UPDATE letter_requests SET status = $1, admin_notes = COALESCE($2, admin_notes), updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
+    [status, admin_notes || null, id]
+  );
 
-    memoryStore.letter_requests[index].status = status;
-    if (admin_notes) {
-      memoryStore.letter_requests[index].admin_notes = admin_notes;
-    }
-    memoryStore.letter_requests[index].updated_at = new Date().toISOString();
-
-    return memoryStore.letter_requests[index];
-  } else {
-    const result = await pool.query(
-      'UPDATE letter_requests SET status = $1, admin_notes = COALESCE($2, admin_notes), updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
-      [status, admin_notes || null, id]
-    );
-
-    if (result.rows.length === 0) {
-      throw { status: 404, message: 'Pengajuan surat tidak ditemukan.' };
-    }
-
-    return result.rows[0];
+  if (result.rows.length === 0) {
+    throw { status: 404, message: 'Pengajuan surat tidak ditemukan.' };
   }
+
+  return result.rows[0];
 }
