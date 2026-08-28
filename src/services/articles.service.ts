@@ -1,5 +1,6 @@
 import { pool } from '../config/db';
 import { appCache } from '../utils/cache';
+import { syncKnowledgeVector, deleteKnowledgeVector } from './embedding.service';
 
 export interface FetchArticlesQuery {
   category?: string;
@@ -72,13 +73,14 @@ export async function fetchArticlesQuery(query: FetchArticlesQuery) {
 }
 
 export async function fetchArticleDetail(idOrSlug: string) {
-  const cacheKey = `articles:detail:${idOrSlug}`;
+  const cleanParam = idOrSlug.trim();
+  const cacheKey = `articles:detail:${cleanParam}`;
   const cached = appCache.get<any>(cacheKey);
   if (cached) return cached;
 
   const result = await pool.query(
-    'SELECT a.*, u.full_name as author_name FROM articles a LEFT JOIN users u ON a.author_id = u.id WHERE a.id = $1 OR a.slug = $1 OR a.id ILIKE $2',
-    [idOrSlug, `%${idOrSlug}%`]
+    'SELECT a.*, u.full_name as author_name FROM articles a LEFT JOIN users u ON a.author_id = u.id WHERE a.id::text = $1 OR a.slug = $1',
+    [cleanParam]
   );
 
   if (result.rows.length === 0) {
@@ -100,20 +102,26 @@ export async function createArticle(data: any, author: { id?: string; username?:
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)+/g, '');
 
-  const id = `art-${Date.now()}`;
   const computedSummary = summary || content.slice(0, 150) + '...';
   const image = featured_image_url || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1200&q=80';
   const authorId = author.id || '00000000-0000-0000-0000-000000000001';
   const published = is_published !== undefined ? is_published : true;
 
   const result = await pool.query(
-    `INSERT INTO articles (id, title, slug, content, summary, category, featured_image_url, author_id, is_published)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-    [id, title, slug, content, computedSummary, category, image, authorId, published]
+    `INSERT INTO articles (title, slug, content, summary, category, featured_image_url, author_id, is_published)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [title, slug, content, computedSummary, category, image, authorId, published]
   );
 
+  const article = result.rows[0];
+
+  // Auto-sync vector embedding to pgvector
+  if (published) {
+    syncKnowledgeVector('article', article.id, article.title, `${article.summary}\n${article.content}`, { category: article.category, slug: article.slug }).catch(() => null);
+  }
+
   appCache.del('articles:*');
-  return result.rows[0];
+  return article;
 }
 
 export async function updateArticle(id: string, data: any) {
@@ -128,7 +136,7 @@ export async function updateArticle(id: string, data: any) {
       featured_image_url = COALESCE($5, featured_image_url),
       is_published = COALESCE($6, is_published),
       updated_at = CURRENT_TIMESTAMP
-     WHERE id = $7 RETURNING *`,
+     WHERE id::text = $7 RETURNING *`,
     [title, content, summary, category, featured_image_url, is_published, id]
   );
 
@@ -136,14 +144,26 @@ export async function updateArticle(id: string, data: any) {
     throw { status: 404, message: 'Artikel tidak ditemukan.' };
   }
 
+  const article = res.rows[0];
+
+  // Auto-sync vector embedding
+  if (article.is_published) {
+    syncKnowledgeVector('article', article.id, article.title, `${article.summary}\n${article.content}`, { category: article.category, slug: article.slug }).catch(() => null);
+  } else {
+    deleteKnowledgeVector('article', article.id).catch(() => null);
+  }
+
   appCache.del('articles:*');
-  return res.rows[0];
+  return article;
 }
 
 export async function deleteArticle(id: string) {
-  const res = await pool.query('DELETE FROM articles WHERE id = $1', [id]);
+  const res = await pool.query('DELETE FROM articles WHERE id::text = $1', [id]);
   if (res.rowCount === 0) {
     throw { status: 404, message: 'Artikel tidak ditemukan.' };
   }
+
+  // Auto-delete vector embedding
+  deleteKnowledgeVector('article', id).catch(() => null);
   appCache.del('articles:*');
 }

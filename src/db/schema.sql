@@ -104,8 +104,25 @@ CREATE TABLE IF NOT EXISTS letter_requests (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 9. KNOWLEDGE VECTORS TABLE (RAG & PGVECTOR SEMANTIC SEARCH)
+CREATE TABLE IF NOT EXISTS knowledge_vectors (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    source_type VARCHAR(50) NOT NULL, -- 'faq', 'article', 'highlight', 'staff', 'guide', 'setting'
+    source_id VARCHAR(100) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    metadata JSONB DEFAULT '{}',
+    embedding vector(768), -- 768-dimensions for Google Gemini text-embedding-004
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (source_type, source_id)
+);
+
 -- INDEXES FOR PERFORMANCE & SEO CRAWL
 CREATE INDEX IF NOT EXISTS idx_articles_slug ON articles(slug);
 CREATE INDEX IF NOT EXISTS idx_highlights_slug ON village_highlights(slug);
 CREATE INDEX IF NOT EXISTS idx_letter_requests_ticket ON letter_requests(ticket_number);
 CREATE INDEX IF NOT EXISTS idx_letter_requests_nik ON letter_requests(applicant_nik);
+
+-- HNSW INDEX FOR PGVECTOR COSINE SIMILARITY SEARCH
+CREATE INDEX IF NOT EXISTS idx_knowledge_vectors_embedding ON knowledge_vectors USING hnsw (embedding vector_cosine_ops);

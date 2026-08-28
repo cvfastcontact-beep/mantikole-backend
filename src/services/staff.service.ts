@@ -1,5 +1,6 @@
 import { pool } from '../config/db';
 import { appCache } from '../utils/cache';
+import { syncKnowledgeVector, deleteKnowledgeVector } from './embedding.service';
 
 const CACHE_KEY = 'staff:all';
 
@@ -31,8 +32,19 @@ export async function createStaff(data: any) {
     [id, name, role, description, image, order]
   );
 
+  const staff = result.rows[0];
+
+  // Auto-sync vector embedding
+  syncKnowledgeVector(
+    'staff',
+    staff.id,
+    `${staff.name} - ${staff.role}`,
+    `Perangkat desa Mantikole: ${staff.name} menjabat sebagai ${staff.role}. ${staff.description || ''}`,
+    { role: staff.role, order_index: staff.order_index }
+  ).catch(() => null);
+
   appCache.del(CACHE_KEY);
-  return result.rows[0];
+  return staff;
 }
 
 export async function updateStaff(id: string, data: any) {
@@ -53,8 +65,19 @@ export async function updateStaff(id: string, data: any) {
     throw { status: 404, message: 'Data perangkat desa tidak ditemukan.' };
   }
 
+  const staff = result.rows[0];
+
+  // Auto-sync vector embedding
+  syncKnowledgeVector(
+    'staff',
+    staff.id,
+    `${staff.name} - ${staff.role}`,
+    `Perangkat desa Mantikole: ${staff.name} menjabat sebagai ${staff.role}. ${staff.description || ''}`,
+    { role: staff.role, order_index: staff.order_index }
+  ).catch(() => null);
+
   appCache.del(CACHE_KEY);
-  return result.rows[0];
+  return staff;
 }
 
 export async function deleteStaff(id: string) {
@@ -62,5 +85,8 @@ export async function deleteStaff(id: string) {
   if (result.rowCount === 0) {
     throw { status: 404, message: 'Data perangkat desa tidak ditemukan.' };
   }
+
+  // Auto-delete vector embedding
+  deleteKnowledgeVector('staff', id).catch(() => null);
   appCache.del(CACHE_KEY);
 }

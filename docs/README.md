@@ -1,6 +1,6 @@
 # Dokumentasi Backend REST API Website Desa Mantikole
 
-Selamat datang di direktori dokumentasi teknis untuk **Backend REST API Website Desa Mantikole** (Node.js + Express.js + TypeScript + Neon Lakebase Postgres + Neon Object Storage).
+Selamat datang di direktori dokumentasi teknis untuk **Backend REST API Website Desa Mantikole** (Node.js + Express.js + TypeScript + Neon Lakebase Postgres + pgvector + Neon Object Storage).
 
 ## 📚 Daftar Dokumentasi Riwayat Perubahan
 
@@ -15,6 +15,8 @@ Seluruh dokumentasi disusun berdasarkan tanggal dan judul fitur sesuai perkemban
 | **2026-08-27** | [`2026-08-27-migrasi-dan-integrasi-neon-postgresql.md`](./2026-08-27-migrasi-dan-integrasi-neon-postgresql.md) | Integrasi penuh Neon Lakebase Postgres (IaC neon.ts, CLI linkage, automated migration & live seeding). |
 | **2026-08-27** | [`2026-08-27-integrasi-neon-object-storage.md`](./2026-08-27-integrasi-neon-object-storage.md) | Integrasi Neon Object Storage (Bucket `mantikole-media`), REST API upload endpoint, dan komponen `ImageUploader` di CMS. |
 | **2026-08-27** | [`2026-08-27-penguatan-arsitektur-caching-dan-keamanan-zod.md`](./2026-08-27-penguatan-arsitektur-caching-dan-keamanan-zod.md) | In-memory TTL Caching (<1ms latency), Auto-Invalidation, Validasi Zod terpusat, Sanitasi XSS, dan SQL Paginasi. |
+| **2026-08-28** | [`2026-08-28-integrasi-pgvector-rag-dan-embedding-semantic-search.md`](./2026-08-28-integrasi-pgvector-rag-dan-embedding-semantic-search.md) | Native `pgvector` Semantic Search (HNSW index, Cosine Distance), auto-sync CMS hooks, dan Google Gemini RAG. |
+| **2026-08-28** | [`2026-08-28-perbaikan-tipe-data-uuid-postgresql.md`](./2026-08-28-perbaikan-tipe-data-uuid-postgresql.md) | Perbaikan casting eksplisit `id::text` pada slug artikel dan otomasi UUID PostgreSQL pada tabel pengajuan surat warga. |
 
 ---
 

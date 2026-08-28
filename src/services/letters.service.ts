@@ -28,16 +28,15 @@ export async function createLetterRequest(data: any) {
     };
   }
 
-  const id = `req-${Date.now()}`;
   const ticket_number = generateTicketNumber();
   const admin_notes = 'Pengajuan surat baru. Menunggu proses verifikasi berkas oleh perangkat desa.';
   const attachments = attachment_urls || [];
 
   const result = await pool.query(
     `INSERT INTO letter_requests 
-     (id, ticket_number, applicant_nik, applicant_name, applicant_phone, applicant_address, letter_type_code, attachment_urls, status, admin_notes)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-    [id, ticket_number, applicant_nik, applicant_name, applicant_phone, applicant_address, letter_type_code, attachments, 'PENDING', admin_notes]
+     (ticket_number, applicant_nik, applicant_name, applicant_phone, applicant_address, letter_type_code, attachment_urls, status, admin_notes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [ticket_number, applicant_nik, applicant_name, applicant_phone, applicant_address, letter_type_code, attachments, 'PENDING', admin_notes]
   );
 
   const row = result.rows[0];
@@ -51,7 +50,8 @@ export async function createLetterRequest(data: any) {
 }
 
 export async function trackLetterByTicket(ticketNumber: string) {
-  const result = await pool.query('SELECT * FROM letter_requests WHERE ticket_number = $1', [ticketNumber.trim()]);
+  const cleanTicket = ticketNumber.trim().toUpperCase();
+  const result = await pool.query('SELECT * FROM letter_requests WHERE ticket_number = $1', [cleanTicket]);
 
   if (result.rows.length === 0) {
     throw {
@@ -64,36 +64,45 @@ export async function trackLetterByTicket(ticketNumber: string) {
 }
 
 export async function fetchAdminLetterRequests(status?: string, search?: string) {
-  let sql = 'SELECT * FROM letter_requests WHERE 1=1';
+  let sql = `
+    SELECT r.*, t.title as letter_type_name
+    FROM letter_requests r
+    LEFT JOIN letter_templates t ON r.letter_type_code = t.code
+    WHERE 1=1
+  `;
   const params: any[] = [];
 
-  if (status) {
-    params.push(status);
-    sql += ` AND status = $${params.length}`;
+  if (status && status !== 'ALL') {
+    params.push(status.toUpperCase());
+    sql += ` AND r.status = $${params.length}`;
   }
 
   if (search) {
     params.push(`%${search}%`);
-    sql += ` AND (ticket_number ILIKE $${params.length} OR applicant_name ILIKE $${params.length} OR applicant_nik ILIKE $${params.length})`;
+    sql += ` AND (r.applicant_name ILIKE $${params.length} OR r.applicant_nik ILIKE $${params.length} OR r.ticket_number ILIKE $${params.length})`;
   }
 
-  sql += ' ORDER BY created_at DESC';
+  sql += ' ORDER BY r.created_at DESC';
+
   const result = await pool.query(sql, params);
   return result.rows;
 }
 
-export async function updateLetterRequestStatus(id: string, status: string, admin_notes?: string) {
-  if (!status || !['PENDING', 'PROCESSED', 'COMPLETED', 'REJECTED'].includes(status)) {
-    throw { status: 400, message: 'Status tidak valid. Harus PENDING, PROCESSED, COMPLETED, atau REJECTED.' };
+export async function updateLetterRequestStatus(id: string, status: string, adminNotes?: string) {
+  const validStatuses = ['PENDING', 'PROCESSED', 'COMPLETED', 'REJECTED'];
+  if (!validStatuses.includes(status)) {
+    throw { status: 400, message: 'Status tidak valid.' };
   }
 
   const result = await pool.query(
-    'UPDATE letter_requests SET status = $1, admin_notes = COALESCE($2, admin_notes), updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
-    [status, admin_notes || null, id]
+    `UPDATE letter_requests 
+     SET status = $1, admin_notes = COALESCE($2, admin_notes), updated_at = CURRENT_TIMESTAMP 
+     WHERE id::text = $3 RETURNING *`,
+    [status, adminNotes, id]
   );
 
   if (result.rows.length === 0) {
-    throw { status: 404, message: 'Pengajuan surat tidak ditemukan.' };
+    throw { status: 404, message: 'Data permohonan surat tidak ditemukan.' };
   }
 
   return result.rows[0];

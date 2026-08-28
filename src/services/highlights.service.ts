@@ -1,5 +1,6 @@
 import { pool } from '../config/db';
 import { appCache } from '../utils/cache';
+import { syncKnowledgeVector } from './embedding.service';
 
 export async function fetchHighlights(type?: string, search?: string) {
   const cacheKey = `highlights:list:${type || 'all'}:${search || ''}`;
@@ -27,12 +28,16 @@ export async function fetchHighlights(type?: string, search?: string) {
   return rows;
 }
 
-export async function fetchHighlightDetail(slug: string) {
-  const cacheKey = `highlights:detail:${slug}`;
+export async function fetchHighlightDetail(slugOrId: string) {
+  const cleanParam = slugOrId.trim();
+  const cacheKey = `highlights:detail:${cleanParam}`;
   const cached = appCache.get<any>(cacheKey);
   if (cached) return cached;
 
-  const result = await pool.query('SELECT * FROM village_highlights WHERE slug = $1', [slug]);
+  const result = await pool.query(
+    'SELECT * FROM village_highlights WHERE id::text = $1 OR slug = $1',
+    [cleanParam]
+  );
 
   if (result.rows.length === 0) {
     throw { status: 404, message: 'Data wisata/komoditas tidak ditemukan.' };
@@ -55,7 +60,6 @@ export async function createHighlight(data: any) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)+/g, '');
 
-  const id = `hl-${Date.now()}`;
   const loc = location_details || 'Desa Mantikole, Dolo Barat, Sigi';
   const lat = latitude || -1.0745;
   const lng = longitude || 119.8322;
@@ -63,11 +67,22 @@ export async function createHighlight(data: any) {
   const gallery = gallery_urls || ['https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1200&q=80'];
 
   const result = await pool.query(
-    `INSERT INTO village_highlights (id, title, slug, type, short_description, full_description, location_details, latitude, longitude, price_info, gallery_urls)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-    [id, title, slug, type, short_description, full_description, loc, lat, lng, price, gallery]
+    `INSERT INTO village_highlights (title, slug, type, short_description, full_description, location_details, latitude, longitude, price_info, gallery_urls)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+    [title, slug, type, short_description, full_description, loc, lat, lng, price, gallery]
   );
 
+  const item = result.rows[0];
+
+  // Auto-sync vector embedding
+  syncKnowledgeVector(
+    'highlight',
+    item.id,
+    `${item.title} (${item.type})`,
+    `${item.short_description}\n${item.full_description}\nLokasi: ${item.location_details}\nInfo Biaya/Tarif: ${item.price_info}`,
+    { type: item.type, slug: item.slug }
+  ).catch(() => null);
+
   appCache.del('highlights:*');
-  return result.rows[0];
+  return item;
 }

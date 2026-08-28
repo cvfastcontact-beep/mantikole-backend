@@ -1,5 +1,6 @@
 import { pool } from '../config/db';
 import { appCache } from '../utils/cache';
+import { syncKnowledgeVector, deleteKnowledgeVector } from './embedding.service';
 
 const CACHE_KEY = 'faqs:all';
 
@@ -30,8 +31,13 @@ export async function createFaq(data: any) {
     [id, question, answer, cat, order]
   );
 
+  const faq = result.rows[0];
+
+  // Auto-sync vector embedding
+  syncKnowledgeVector('faq', faq.id, faq.question, faq.answer, { category: faq.category }).catch(() => null);
+
   appCache.del(CACHE_KEY);
-  return result.rows[0];
+  return faq;
 }
 
 export async function updateFaq(id: string, data: any) {
@@ -51,8 +57,13 @@ export async function updateFaq(id: string, data: any) {
     throw { status: 404, message: 'Data FAQ tidak ditemukan.' };
   }
 
+  const faq = result.rows[0];
+
+  // Auto-sync vector embedding
+  syncKnowledgeVector('faq', faq.id, faq.question, faq.answer, { category: faq.category }).catch(() => null);
+
   appCache.del(CACHE_KEY);
-  return result.rows[0];
+  return faq;
 }
 
 export async function deleteFaq(id: string) {
@@ -60,5 +71,8 @@ export async function deleteFaq(id: string) {
   if (result.rowCount === 0) {
     throw { status: 404, message: 'Data FAQ tidak ditemukan.' };
   }
+
+  // Auto-delete vector embedding
+  deleteKnowledgeVector('faq', id).catch(() => null);
   appCache.del(CACHE_KEY);
 }
