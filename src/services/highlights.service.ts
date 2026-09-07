@@ -1,6 +1,6 @@
 import { pool } from '../config/db';
 import { appCache } from '../utils/cache';
-import { syncKnowledgeVector } from './embedding.service';
+import { syncKnowledgeVector, deleteKnowledgeVector } from './embedding.service';
 
 export async function fetchHighlights(type?: string, search?: string) {
   const cacheKey = `highlights:list:${type || 'all'}:${search || ''}`;
@@ -85,4 +85,53 @@ export async function createHighlight(data: any) {
 
   appCache.del('highlights:*');
   return item;
+}
+
+export async function updateHighlight(id: string, data: any) {
+  const { title, type, short_description, full_description, location_details, latitude, longitude, price_info, gallery_urls } = data;
+
+  const result = await pool.query(
+    `UPDATE village_highlights SET 
+      title = COALESCE($1, title),
+      type = COALESCE($2, type),
+      short_description = COALESCE($3, short_description),
+      full_description = COALESCE($4, full_description),
+      location_details = COALESCE($5, location_details),
+      latitude = COALESCE($6, latitude),
+      longitude = COALESCE($7, longitude),
+      price_info = COALESCE($8, price_info),
+      gallery_urls = COALESCE($9, gallery_urls),
+      updated_at = CURRENT_TIMESTAMP
+     WHERE id::text = $10 RETURNING *`,
+    [title, type, short_description, full_description, location_details, latitude, longitude, price_info, gallery_urls, id]
+  );
+
+  if (result.rows.length === 0) {
+    throw { status: 404, message: 'Data wisata/komoditas tidak ditemukan.' };
+  }
+
+  const item = result.rows[0];
+
+  // Auto-sync vector embedding
+  syncKnowledgeVector(
+    'highlight',
+    item.id,
+    `${item.title} (${item.type})`,
+    `${item.short_description}\n${item.full_description}\nLokasi: ${item.location_details}\nInfo Biaya/Tarif: ${item.price_info}`,
+    { type: item.type, slug: item.slug }
+  ).catch(() => null);
+
+  appCache.del('highlights:*');
+  return item;
+}
+
+export async function deleteHighlight(id: string) {
+  const result = await pool.query('DELETE FROM village_highlights WHERE id::text = $1', [id]);
+  if (result.rowCount === 0) {
+    throw { status: 404, message: 'Data wisata/komoditas tidak ditemukan.' };
+  }
+
+  // Auto-delete vector embedding
+  deleteKnowledgeVector('highlight', id).catch(() => null);
+  appCache.del('highlights:*');
 }

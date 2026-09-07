@@ -17,6 +17,8 @@ Seluruh dokumentasi disusun berdasarkan tanggal dan judul fitur sesuai perkemban
 | **2026-08-27** | [`2026-08-27-penguatan-arsitektur-caching-dan-keamanan-zod.md`](./2026-08-27-penguatan-arsitektur-caching-dan-keamanan-zod.md) | In-memory TTL Caching (<1ms latency), Auto-Invalidation, Validasi Zod terpusat, Sanitasi XSS, dan SQL Paginasi. |
 | **2026-08-28** | [`2026-08-28-integrasi-pgvector-rag-dan-embedding-semantic-search.md`](./2026-08-28-integrasi-pgvector-rag-dan-embedding-semantic-search.md) | Native `pgvector` Semantic Search (HNSW index, Cosine Distance), auto-sync CMS hooks, dan Google Gemini RAG. |
 | **2026-08-28** | [`2026-08-28-perbaikan-tipe-data-uuid-postgresql.md`](./2026-08-28-perbaikan-tipe-data-uuid-postgresql.md) | Perbaikan casting eksplisit `id::text` pada slug artikel dan otomasi UUID PostgreSQL pada tabel pengajuan surat warga. |
+| **2026-09-04** | [`2026-09-04-setup-integrasi-llm-gemini-dan-env.md`](./2026-09-04-setup-integrasi-llm-gemini-dan-env.md) | Integrasi penuh Google Gemini LLM & text-embedding-004 dengan Dynamic Key Resolver dan fallback resilience. |
+
 
 ---
 

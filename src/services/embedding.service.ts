@@ -1,10 +1,19 @@
 import { pool } from '../config/db';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY || '';
+/**
+ * Retrieve Gemini API Key dynamically from environment variables
+ */
+const getGeminiApiKey = (): string => {
+  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY || process.env.GOOGLE_API_KEY || '';
+  if (!key || key.startsWith('your_') || key.includes('placeholder') || key.trim() === '') {
+    return '';
+  }
+  return key.trim();
+};
 
 /**
- * Generate a 768-dimensional text embedding vector using Google Gemini text-embedding-004
- * Falls back gracefully to normalized pseudo-vector if API key is not yet set.
+ * Generate a 768-dimensional text embedding vector using Google Gemini gemini-embedding-001
+ * Falls back gracefully to normalized deterministic pseudo-vector if API key is not yet set.
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   if (!text || text.trim().length === 0) {
@@ -12,16 +21,18 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   }
 
   const cleanText = text.replace(/\s+/g, ' ').trim().slice(0, 2048);
+  const apiKey = getGeminiApiKey();
 
-  if (GEMINI_API_KEY) {
+  if (apiKey) {
     try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${GEMINI_API_KEY}`;
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`;
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'models/text-embedding-004',
+          model: 'models/gemini-embedding-001',
           content: { parts: [{ text: cleanText }] },
+          outputDimensionality: 768,
         }),
       });
 
@@ -32,7 +43,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
         }
       } else {
         const errJson = await response.json().catch(() => null);
-        console.warn('[Embedding API Warning]:', errJson || response.statusText);
+        console.warn('[Gemini Embedding API Warning]:', errJson || response.statusText);
       }
     } catch (err) {
       console.warn('[Embedding Service Fallback Active]:', err);
@@ -44,7 +55,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 }
 
 /**
- * Deterministic local feature hashing (Ponytail Resilience)
+ * Deterministic local feature hashing (Ponytail Zero-Dependency Resilience)
  */
 function generateDeterministicVector(text: string, dimensions: number = 768): number[] {
   const vec = new Array(dimensions).fill(0);
@@ -159,4 +170,76 @@ export async function searchSimilarKnowledge(
     console.error('[pgvector Search Error]:', err);
     return [];
   }
+}
+
+/**
+ * Full knowledge vector re-sync utility (Syncs all FAQs, Articles, Highlights, Staff & Village Profile)
+ */
+export async function syncAllKnowledgeVectors(): Promise<{ totalIndexed: number }> {
+  let count = 0;
+
+  // 1. Village Profile Knowledge
+  const villageProfiles = [
+    {
+      id: 'profile-general',
+      title: 'Profil Umum & Geografis Desa Mantikole',
+      content: 'Desa Mantikole terletak di Kecamatan Dolo Barat, Kabupaten Sigi, Provinsi Sulawesi Tengah. Memiliki luas wilayah sekitar 18.5 km2 dengan topografi perbukitan dan lembah subur di tepi Sungai Palu.',
+      type: 'profile',
+    },
+    {
+      id: 'profile-tourism-hotspring',
+      title: 'Pemandian Air Panas Alami Mantikole',
+      content: 'Pemandian Air Panas Alami Mantikole merupakan destinasi wisata unggulan dengan kolam air panas alami bersumber dari mata air belerang pegunungan. Tiket masuk: Rp 5.000 (Dewasa) dan Rp 3.000 (Anak-anak). Fasilitas: Gazebo, kamar bilas, kantin, spot foto alami, dan area parkir luas.',
+      type: 'highlight',
+    },
+    {
+      id: 'profile-services',
+      title: 'Pelayanan Kantor Desa & Pengajuan Surat',
+      content: 'Pelayanan fisik Kantor Desa Mantikole buka Senin hingga Jumat pukul 08:00 - 15:00 WITA di Jl. Poros Palu - Kulawi. Warga dapat mengajukan Surat Keterangan Usaha (SKU), Surat Keterangan Domisili (SKD), dan Surat Keterangan Tidak Mampu (SKTM) secara online melalui website desa.',
+      type: 'service',
+    },
+  ];
+
+  for (const item of villageProfiles) {
+    await syncKnowledgeVector(item.type, item.id, item.title, item.content);
+    count++;
+  }
+
+  // 2. FAQs
+  try {
+    const faqRes = await pool.query('SELECT id, question, answer, category FROM faqs');
+    for (const faq of faqRes.rows) {
+      await syncKnowledgeVector('faq', String(faq.id), faq.question, faq.answer, { category: faq.category });
+      count++;
+    }
+  } catch (e) {}
+
+  // 3. Articles
+  try {
+    const artRes = await pool.query("SELECT id, title, content, summary, category FROM articles WHERE is_published = true");
+    for (const art of artRes.rows) {
+      await syncKnowledgeVector('article', String(art.id), art.title, `${art.summary || ''}\n${art.content}`, { category: art.category });
+      count++;
+    }
+  } catch (e) {}
+
+  // 4. Village Highlights
+  try {
+    const hlRes = await pool.query('SELECT id, title, short_description, full_description, type FROM village_highlights');
+    for (const hl of hlRes.rows) {
+      await syncKnowledgeVector('highlight', String(hl.id), `${hl.title} (${hl.type})`, `${hl.short_description}\n${hl.full_description}`, { type: hl.type });
+      count++;
+    }
+  } catch (e) {}
+
+  // 5. Staff / Aparatur
+  try {
+    const staffRes = await pool.query('SELECT id, name, role, description FROM village_staff');
+    for (const staff of staffRes.rows) {
+      await syncKnowledgeVector('staff', String(staff.id), `Perangkat Desa: ${staff.name} (${staff.role})`, `Nama: ${staff.name}, Jabatan: ${staff.role}. ${staff.description || ''}`, { role: staff.role });
+      count++;
+    }
+  } catch (e) {}
+
+  return { totalIndexed: count };
 }
